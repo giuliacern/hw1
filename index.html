@@ -1,42 +1,225 @@
 <!DOCTYPE html>
 <html>
+	<head>
 
-<script id="vertex-shader" type="x-shader/x-vertex">
+		<script type="text/javascript" src="Common/webgl-utils.js"></script>
+		<script type="text/javascript" src="Common/initShaders.js"></script>
+		<script type="text/javascript" src="Common/MV.js"></script>
+		<script type="text/javascript" src="homework1.js"></script>
 
-attribute  vec4 vPosition;
-attribute  vec4 vColor;
+		<script id="vertex-shader" type="x-shader/x-vertex">
 
-varying vec4 fColor;
+			attribute  vec4 vPosition;
+			attribute  vec4 vColor;
 
-void main()
-{
-    fColor = vColor;
-    gl_Position = vPosition;
-}
-</script>
+			varying vec4 fColor;
 
-<script id="fragment-shader" type="x-shader/x-fragment">
+			varying mat4 TransScaledMat;
+				uniform mat4 modelView;
 
-precision mediump float;
+				uniform mat4 ProjectionMat;
 
-varying vec4 fColor;
+				uniform mat4 transMat;
+				uniform mat4 scaleMat;
 
-void
-main()
-{
-    gl_FragColor = fColor;
 
-}
-</script>
+				uniform vec4 lightPositionVec;
 
-<script type="text/javascript" src="Common/webgl-utils.js"></script>
-<script type="text/javascript" src="Common/initShaders.js"></script>
-<script type="text/javascript" src="Common/MV.js"></script>
-<script type="text/javascript" src="homework1.js"></script>
+				uniform vec4 v_ambientProductVec;
+				uniform vec4 v_diffuseProductVec;
+				uniform vec4 v_specularProductVec;
 
-<body>
-<canvas id="gl-canvas" width="1024" height="1024">
-Oops ... your browser doesn't support the HTML5 canvas element
-</canvas>
-</body>
+				uniform float v_materialShininessVal;
+
+				varying vec3 fN, fL, fE;
+
+				uniform bool shadingType;
+
+				varying vec2 fTexCoord;
+				attribute vec2 vTexCoord;
+
+			void main() {
+
+					TransScaledMat = transMat * scaleMat;
+					gl_Position = ProjectionMat * modelView * TransScaledMat * vPosition;
+
+					vec3 pos = -(modelView * TransScaledMat * vPosition).xyz;
+					vec3 light = lightPositionVec.xyz;
+
+					vec3 L = normalize( light - pos );
+
+					vec3 E = normalize( -pos );
+					vec3 H = normalize( L + E );
+
+					vec3 N = normalize((modelView * TransScaledMat * vColor).xyz);
+
+					if (!shadingType) {				// Gouraud
+
+						vec4 ambient = v_ambientProductVec;
+						float Kd = max(dot(L, N), 0.0);
+
+						vec4 diffuse = Kd * v_diffuseProductVec;
+						float Ks = pow(max(dot(N, H), 0.0), v_materialShininessVal);
+
+						vec4 specular = Ks * v_specularProductVec;
+						if (dot(L, N) < 0.0) specular = vec4(0.0, 0.0, 0.0, 1.0);
+
+						fColor = ambient + diffuse + specular;
+						fColor.a = 1.0;
+
+					} else {
+						fL = L;
+						fN = N;
+						fE = E;
+					}
+
+					fTexCoord = vTexCoord;
+			}
+
+		</script>
+
+		<script id="fragment-shader" type="x-shader/x-fragment">
+
+			precision mediump float;
+
+			varying vec4 fColor;
+
+
+			//Step 6
+				uniform bool shadingType;
+
+				uniform vec4 f_ambientProductVec;
+				uniform vec4 f_diffuseProductVec;
+				uniform vec4 f_specularProductVec;
+
+				uniform float f_materialShininessVal;
+
+				varying vec3 fN, fL, fE;
+
+			// Step 7
+				varying  vec2 fTexCoord;
+
+				uniform sampler2D texture;
+
+			void main() {
+
+				vec4 fColorFinal;
+
+				// Step 6
+					if (!shadingType) {
+						fColorFinal = fColor;
+					} else {
+						vec4 fColorF;
+						vec3 H = normalize(fL + fE);
+						vec4 ambient = f_ambientProductVec;
+						float Kd = max(dot(fL, fN), 0.0);
+						vec4 diffuse = Kd * f_diffuseProductVec;
+						float Ks = pow(max(dot(fN, H), 0.0), f_materialShininessVal);
+						vec4 specular = Ks * f_specularProductVec;
+						if (dot(fL, fN) < 0.0) specular = vec4(0.0, 0.0, 0.0, 1.0);
+						fColorF = ambient + diffuse + specular;
+						fColorF.a = 1.0;
+						fColorFinal = fColorF;
+					}
+
+					gl_FragColor = fColorFinal * texture2D( texture, fTexCoord );
+			}
+
+		</script>
+
+		<style>
+			h1, h2, h3,hr {	margin-block-start: 0;
+							margin-block-end: 0;}
+			h2{ text-align: center;}
+		</style>
+	</head>
+	<body>
+
+		<div style="background-color: black; padding-left:10px; padding-top:10px; float:left;
+					width: 1384px">
+
+			<div style="background-color:rgb(255, 255, 255);
+						width: 300px;
+						height: 1024px;
+						padding-left: 30px;
+						padding-right: 30px;
+						float: left">
+
+
+			  <h3 style="text-align: center;" class="text-light"> Interactive Graphics Homework 1 </h4>
+			  <hr style="background:white;">
+
+				<h2>Camera</h2>
+				<h3>Radius</h3>
+				<input id="RadiusCameraSlider" type="range" min="0.01" max="10" step="0.01" value="1.5">
+				<span id="RadiusCameraSpan"></span>
+
+				<h3>Theta</h3>
+				<input id="thetaCameraSlider" type="range" min="-10.0" max="10.0" step="0.1" value="0">
+				<span id="thetaCameraSpan"></span>
+
+				<h3>Phi</h3>
+				<input id="phiCameraSlider" type="range" min="-10.0" max="10.0" step="0.1" value="0">
+				<span id="phiCameraSpan"></span>
+
+				<hr style="background:white;">
+
+				<h2>Projection</h2>
+				<h3>Near</h3>
+				<input id="nearProjectionSlider" type="range" min="0.05" max="2.0" step="0.01" value="0.01">
+				<span id="nearProjectionSpan"></span>
+
+				<h3>Far</h3>
+				<input id="farProjectionSlider" type="range" min="1.0" max="5" step="0.1" value="10">
+				<span id="farProjectionSpan"></span>
+
+				<h3>Fovy</h3>
+				<input id="fovyProjectionSlider" type="range" min="10" max="100.0" step="0.01" value="120">
+				<span id="fovyProjectionSpan"></span>
+
+				<h3>Aspect</h3>
+				<input id="aspectProjectionSlider" type="range" min="0.5" max="2" step="0.1" value="1">
+				<span id="aspectProjectionSpan"></span>
+
+				<hr style="background:white;">
+
+				<h2>Translation</h2>
+				<h3>X-axis</h3>
+				<input id="xPositionSlider" type="range" min="-1.0" max="1.0" step="0.1" value="0">
+				<span id="xPositionSpan"></span>
+
+				<h3>Y-axis</h3>
+				<input id="yPositionSlider" type="range" min="-1.0" max="1.0" step="0.1" value="0">
+				<span id="yPositionSpan"></span>
+
+				<h3>Z-axis</h3>
+				<input id="zPositionSlider" type="range" min="-1.0" max="1.0" step="0.1" value="0">
+				<span id="zPositionSpan"></span>
+
+				<hr style="background:white;">
+
+				<h2>Scale</h2>
+				<input id="scaleSlider" type="range" min="0.1" max="2.0" step="0.1" value="1">
+				<span id="scaleSpan"></span>
+
+				<hr style="background:white;">
+
+				<h2>Shading</h2>
+				<button id="switchShadingButton">Switch</button>
+				<span id="switchShadingSpan"></span>
+
+			</div>
+
+			<div style="background-color:rgb(0, 0, 0);
+						width: 1024px;
+						height: 1024px;
+						float: left">
+				<canvas id="gl-canvas" width="1024" height="1024">
+					Oops ... your browser doesn't support the HTML5 canvas element
+				</canvas>
+			</div>
+
+
+		</div>
+	</body>
 </html>
